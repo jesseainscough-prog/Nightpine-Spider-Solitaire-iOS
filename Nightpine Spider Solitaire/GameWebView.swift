@@ -22,6 +22,7 @@ struct GameWebView: UIViewRepresentable {
             frame: .zero,
             configuration: configuration
         )
+        webView.navigationDelegate = context.coordinator
 
         webView.isOpaque = false
         webView.backgroundColor = .clear
@@ -48,7 +49,7 @@ struct GameWebView: UIViewRepresentable {
         // The game manages its own UI and state.
     }
 
-    final class Coordinator: NSObject, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
 
         func userContentController(
             _ userContentController: WKUserContentController,
@@ -71,12 +72,62 @@ struct GameWebView: UIViewRepresentable {
             case "haptic":
                 let kind = payload["kind"] as? String ?? "light"
                 performHaptic(kind)
+                
+            case "nativeReadyAck":
+                let version = payload["bridgeVersion"] ?? "unknown"
+                print("Spider Native: JavaScript bridge acknowledged version \(version)")
 
+            case "gameReady":
+                let gameVersion = payload["gameVersion"] ?? "unknown"
+                print("Spider Native: game ready version \(gameVersion)")
+                
             default:
                 print("Spider Native: unhandled message type \(type)")
             }
         }
 
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            print("Spider Native: web view finished loading")
+            
+            sendToJavaScript(
+                webView: webView,
+                type: "nativeReady",
+                payload: ["bridgeVersion": 1]
+            )
+        }
+        
+        func sendToJavaScript(
+            webView: WKWebView,
+            type: String,
+            payload: [String: Any] = [:]
+        ) {
+            let message: [String: Any] = [
+                "type": type,
+                "payload": payload
+            ]
+
+            guard
+                let data = try? JSONSerialization.data(withJSONObject: message),
+                let json = String(data: data, encoding: .utf8)
+            else {
+                print("Spider Native: failed to encode JavaScript message")
+                return
+            }
+
+            let script = """
+            window.dispatchEvent(
+                new CustomEvent('spiderNativeMessage', {
+                    detail: \(json)
+                })
+            );
+            """
+
+            webView.evaluateJavaScript(script) { _, error in
+                if let error {
+                    print("Spider Native: JavaScript error \(error)")
+                }
+            }
+        }
         private func performHaptic(_ kind: String) {
             switch kind {
 

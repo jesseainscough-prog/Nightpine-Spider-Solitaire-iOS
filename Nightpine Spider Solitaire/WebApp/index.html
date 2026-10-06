@@ -229,6 +229,24 @@ function postNative(type,payload={}){
   return true
  }catch(e){return false}
 }
+    
+    window.addEventListener('spiderNativeMessage',e=>{
+      const msg=e.detail||{};
+      const type=msg.type;
+      const payload=msg.payload||{};
+
+      if(!type)return;
+
+      switch(type){
+        case 'nativeReady':
+          console.log('Spider Native: iOS bridge ready',payload);
+          postNative('nativeReadyAck',{bridgeVersion:payload.bridgeVersion||1});
+          break;
+
+        default:
+          console.log('Spider Native: received',type,payload);
+      }
+    });
 function nativeLifecycleSave(reason){
  try{
   clearTimeout(inactivityTimer);
@@ -294,12 +312,13 @@ window.SpiderNative={
  }
 };
 function announceNativeReady(){
- postNative('gameReady',{
-  haptics:true,
-  ads:true,
-  purchases:true,
-  lifecycle:true
- });
+    postNative('gameReady',{
+        gameVersion:'J.21.31',
+        haptics:true,
+        ads:true,
+        purchases:true,
+        lifecycle:true
+    });
 }
 const MONETIZATION_KEY='spider-solitaire-monetization-v1';
 const monetization=(()=>{try{return Object.assign({adsRemoved:false},JSON.parse(localStorage.getItem(MONETIZATION_KEY)||'{}'))}catch(e){return {adsRemoved:false}}})();
