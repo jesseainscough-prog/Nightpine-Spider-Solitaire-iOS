@@ -23,6 +23,9 @@ struct GameWebView: UIViewRepresentable {
             configuration: configuration
         )
         webView.navigationDelegate = context.coordinator
+        
+        context.coordinator.webView = webView
+        context.coordinator.startLifecycleObservers()
 
         webView.isOpaque = false
         webView.backgroundColor = .clear
@@ -50,6 +53,46 @@ struct GameWebView: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+        
+        weak var webView: WKWebView?
+        
+        func startLifecycleObservers() {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(appDidEnterBackground),
+                name: UIApplication.didEnterBackgroundNotification,
+                object: nil
+            )
+
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(appDidBecomeActive),
+                name: UIApplication.didBecomeActiveNotification,
+                object: nil
+            )
+        }
+        
+        @objc func appDidEnterBackground() {
+            print("Spider Native: app entered background")
+            guard let webView else { return }
+
+            sendToJavaScript(
+                webView: webView,
+                type: "lifecycleSave",
+                payload: ["reason": "background"]
+            )
+        }
+
+        @objc func appDidBecomeActive() {
+            print("Spider Native: app became active")
+            guard let webView else { return }
+
+            sendToJavaScript(
+                webView: webView,
+                type: "lifecycleResume",
+                payload: ["reason": "active"]
+            )
+        }
 
         func userContentController(
             _ userContentController: WKUserContentController,
@@ -80,6 +123,14 @@ struct GameWebView: UIViewRepresentable {
             case "gameReady":
                 let gameVersion = payload["gameVersion"] ?? "unknown"
                 print("Spider Native: game ready version \(gameVersion)")
+                
+            case "lifecycleSaveAck":
+                let reason = payload["reason"] ?? "unknown"
+                print("Spider Native: JavaScript lifecycle save acknowledged (\(reason))")
+
+            case "lifecycleResumeAck":
+                let reason = payload["reason"] ?? "unknown"
+                print("Spider Native: JavaScript lifecycle resume acknowledged (\(reason))")
                 
             default:
                 print("Spider Native: unhandled message type \(type)")

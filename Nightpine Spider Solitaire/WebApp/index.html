@@ -242,6 +242,16 @@ function postNative(type,payload={}){
           console.log('Spider Native: iOS bridge ready',payload);
           postNative('nativeReadyAck',{bridgeVersion:payload.bridgeVersion||1});
           break;
+          
+          case 'lifecycleSave':
+              nativeLifecycleSave(payload.reason||'background');
+              postNative('lifecycleSaveAck',{reason:payload.reason||'background'});
+              break;
+
+          case 'lifecycleResume':
+              nativeLifecycleResume(payload.reason||'active');
+              postNative('lifecycleResumeAck',{reason:payload.reason||'active'});
+              break;
 
         default:
           console.log('Spider Native: received',type,payload);
