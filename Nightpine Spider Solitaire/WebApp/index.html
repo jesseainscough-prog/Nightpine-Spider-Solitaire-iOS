@@ -253,9 +253,12 @@ function postNative(type,payload={}){
               postNative('lifecycleResumeAck',{reason:payload.reason||'active'});
               break;
 
-        default:
-          console.log('Spider Native: received',type,payload);
-      }
+              default:
+                  console.log('Spider Native: received',type,payload);
+                  if(window.SpiderNative&&typeof window.SpiderNative.receive==='function'){
+                      window.SpiderNative.receive(type,payload);
+                  }
+                  }
     });
 function nativeLifecycleSave(reason){
  try{
@@ -297,6 +300,11 @@ window.SpiderNative={
     if(nativeAdRequest){
      let pending=nativeAdRequest;nativeAdRequest=null;
      clearTimeout(pending.timer);
+     
+     postNative('adResponseProcessed',{
+         status:type,
+         requestId:payload.requestId||pending.requestId
+     });
      pending.resolve({status:type,requestId:payload.requestId||pending.requestId});
     }
     return true

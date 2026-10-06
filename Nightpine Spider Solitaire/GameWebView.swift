@@ -63,7 +63,7 @@ struct GameWebView: UIViewRepresentable {
                 name: UIApplication.didEnterBackgroundNotification,
                 object: nil
             )
-
+            
             NotificationCenter.default.addObserver(
                 self,
                 selector: #selector(appDidBecomeActive),
@@ -75,43 +75,43 @@ struct GameWebView: UIViewRepresentable {
         @objc func appDidEnterBackground() {
             print("Spider Native: app entered background")
             guard let webView else { return }
-
+            
             sendToJavaScript(
                 webView: webView,
                 type: "lifecycleSave",
                 payload: ["reason": "background"]
             )
         }
-
+        
         @objc func appDidBecomeActive() {
             print("Spider Native: app became active")
             guard let webView else { return }
-
+            
             sendToJavaScript(
                 webView: webView,
                 type: "lifecycleResume",
                 payload: ["reason": "active"]
             )
         }
-
+        
         func userContentController(
             _ userContentController: WKUserContentController,
             didReceive message: WKScriptMessage
         ) {
             guard message.name == "spiderNative" else { return }
-
+            
             guard
                 let body = message.body as? [String: Any],
                 let type = body["type"] as? String
-            else {
+                    else {
                 print("Spider Native: invalid message")
                 return
             }
-
+            
             let payload = body["payload"] as? [String: Any] ?? [:]
-
+            
             switch type {
-
+                
             case "haptic":
                 let kind = payload["kind"] as? String ?? "light"
                 performHaptic(kind)
@@ -119,15 +119,36 @@ struct GameWebView: UIViewRepresentable {
             case "nativeReadyAck":
                 let version = payload["bridgeVersion"] ?? "unknown"
                 print("Spider Native: JavaScript bridge acknowledged version \(version)")
-
+                
             case "gameReady":
                 let gameVersion = payload["gameVersion"] ?? "unknown"
                 print("Spider Native: game ready version \(gameVersion)")
                 
+            case "showInterstitial":
+                let reason = payload["reason"] as? String ?? "unknown"
+                let requestId = payload["requestId"] as? String ?? ""
+
+                print("Spider Native: interstitial requested (\(reason))")
+
+                if let webView = self.webView {
+                    sendToJavaScript(
+                        webView: webView,
+                        type: "adUnavailable",
+                        payload: ["requestId": requestId]
+                    )
+
+                    print("Spider Native: adUnavailable sent for request \(requestId)")
+                }
+
+            case "adResponseProcessed":
+                let status = payload["status"] as? String ?? "unknown"
+                let requestId = payload["requestId"] as? String ?? "unknown"
+                print("Spider Native: JavaScript processed \(status) for request \(requestId)")
+                
             case "lifecycleSaveAck":
                 let reason = payload["reason"] ?? "unknown"
                 print("Spider Native: JavaScript lifecycle save acknowledged (\(reason))")
-
+                
             case "lifecycleResumeAck":
                 let reason = payload["reason"] ?? "unknown"
                 print("Spider Native: JavaScript lifecycle resume acknowledged (\(reason))")
@@ -136,7 +157,7 @@ struct GameWebView: UIViewRepresentable {
                 print("Spider Native: unhandled message type \(type)")
             }
         }
-
+    
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             print("Spider Native: web view finished loading")
             
