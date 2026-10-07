@@ -321,6 +321,11 @@ window.SpiderNative={
      if(type==='purchaseFinished'||type==='purchaseRestored'){
       monetization.adsRemoved=true;saveMonetization();refreshOpenNewDealAfterAdFree();
      }
+     
+     postNative('purchaseResponseProcessed',{
+         status:type,
+         requestId:payload.requestId||pending.requestId
+     });
      pending.resolve({status:type,requestId:payload.requestId||pending.requestId});
     }
     return true
@@ -384,7 +389,15 @@ function showAdFreeSuccess(){
  let old=document.querySelector('.adfree-purchase');if(old)old.remove();
  let o=document.createElement('div');o.className='adfree-purchase adfree-success';
  o.innerHTML=`<div class="panel" role="dialog" aria-modal="true"><h2>PLAY AD FREE</h2><div class="adfree-check">✓</div><p class="adfree-copy">Ad-free play is enabled. Interstitial ads will no longer appear.</p><button type="button" class="adfree-buy">Continue Playing</button></div>`;
- document.body.appendChild(o);let close=()=>o.remove();o.querySelector('.adfree-buy').onclick=close;o.onclick=e=>{if(e.target===o)close()};
+ document.body.appendChild(o);let close=()=>{
+     o.remove();
+     const settings=document.querySelector('.settings');
+     if(settings){
+         const y=settings.scrollTop;
+         settings.remove();
+         showSettings(y);
+     }
+ };o.querySelector('.adfree-buy').onclick=close;o.onclick=e=>{if(e.target===o)close()};
 }
 function requestNativePurchase(action='purchase'){
  if(!nativeHostAvailable())return null;

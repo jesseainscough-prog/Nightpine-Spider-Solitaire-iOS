@@ -1,6 +1,7 @@
 import SwiftUI
 import WebKit
 import UIKit
+import StoreKit
 
 struct GameWebView: UIViewRepresentable {
 
@@ -124,6 +125,10 @@ struct GameWebView: UIViewRepresentable {
                 let gameVersion = payload["gameVersion"] ?? "unknown"
                 print("Spider Native: game ready version \(gameVersion)")
                 
+                Task {
+                    await StoreManager.shared.loadProducts()
+                }
+                
             case "showInterstitial":
                 let reason = payload["reason"] as? String ?? "unknown"
                 let requestId = payload["requestId"] as? String ?? ""
@@ -144,6 +149,69 @@ struct GameWebView: UIViewRepresentable {
                 let status = payload["status"] as? String ?? "unknown"
                 let requestId = payload["requestId"] as? String ?? "unknown"
                 print("Spider Native: JavaScript processed \(status) for request \(requestId)")
+                
+            case "purchaseRemoveAds":
+                let requestId = payload["requestId"] as? String ?? ""
+
+                print("Spider Native: remove_ads purchase requested")
+
+                Task {
+                    let result = await StoreManager.shared.purchaseRemoveAds()
+
+                    guard let webView = self.webView else { return }
+
+                    let responseType: String
+
+                    switch result {
+                    case .purchased:
+                        responseType = "purchaseFinished"
+
+                    case .cancelled:
+                        responseType = "purchaseCancelled"
+
+                    case .pending:
+                        responseType = "purchaseFailed"
+
+                    case .failed:
+                        responseType = "purchaseFailed"
+                    }
+
+                    sendToJavaScript(
+                        webView: webView,
+                        type: responseType,
+                        payload: ["requestId": requestId]
+                    )
+
+                    print("Spider Native: \(responseType) sent for request \(requestId)")
+                }
+                
+            case "restoreRemoveAds":
+                let requestId = payload["requestId"] as? String ?? ""
+
+                print("Spider Native: remove_ads restore requested")
+
+                Task {
+                    let hasEntitlement = await StoreManager.shared.hasRemoveAdsEntitlement()
+
+                    guard let webView = self.webView else { return }
+
+                    let responseType = hasEntitlement
+                        ? "purchaseRestored"
+                        : "purchaseFailed"
+
+                    sendToJavaScript(
+                        webView: webView,
+                        type: responseType,
+                        payload: ["requestId": requestId]
+                    )
+
+                    print("Spider Native: \(responseType) sent for request \(requestId)")
+                }
+                
+            case "purchaseResponseProcessed":
+                let status = payload["status"] as? String ?? "unknown"
+                let requestId = payload["requestId"] as? String ?? "unknown"
+                print("Spider Native: JavaScript processed \(status) for purchase \(requestId)")
                 
             case "lifecycleSaveAck":
                 let reason = payload["reason"] ?? "unknown"
